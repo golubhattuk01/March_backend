@@ -19,3 +19,4 @@ const uploadOnCloudinary = async (filepath) => {
     return null;
   }
 };
+export default uploadOnCloudinary;
