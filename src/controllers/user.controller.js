@@ -90,10 +90,6 @@ const registerUser = asyncHandler(async (req, res) => {
   if (!createdUser) {
     throw new ApiError(500, "something went wrong while creating a user");
   }
-  // console.log(cover);
-  // console.log(avatar);
-  // deleteItem(cover.public_id);
-  // deleteItem(avatar.public_id);
 
   if (createdUser) {
     fs.unlinkSync(avatarPath);
@@ -118,11 +114,11 @@ const loginUser = asyncHandler(async (req, res) => {
   if (!user) {
     throw new ApiError(404, "User not exist");
   }
-  // const isPassValid = await user.isPasswordCorrect(password);
+  const isPassValid = await user.isPasswordCorrect(password);
 
-  // if (!isPassValid) {
-  //   throw new ApiError(404, "Password is incorrect");
-  // }
+  if (!isPassValid) {
+    throw new ApiError(404, "Password is incorrect");
+  }
 
   const { accessToken, refreshToken } = await generateAccessAndRefereshTokens(
     user._id
@@ -221,4 +217,51 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
   }
 });
 
-export { registerUser, loginUser, logOut, refreshAccessToken };
+const changePassword = asyncHandler(async (req, res) => {
+  const { oldPassword, newPassword } = req.body;
+
+  let user = await User.findById(req.user._id);
+  const isPassValid = await user.isPasswordCorrect(oldPassword);
+
+  if (!isPassValid) {
+    throw new ApiError(401, "Current password is Incorrect");
+  }
+
+  user.password = newPassword;
+  await user.save({ validateBeforeSave: false });
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "Passaword Changed Successfully"));
+});
+
+const getCurrentUser = asyncHandler(async (req, res) => {
+  return res.status(200).json(new ApiResponse(200, req.user, "Current User"));
+});
+
+const updateAvatar = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user?._id).select("-password");
+  const oldAvatar = user.avatar;
+  const avatarPath = req.files.avatar[0].path;
+  if (!avatarPath) {
+    throw new ApiError(500, "Can't get avatar image");
+  }
+  const avatar = await uploadOnCloudinary(avatarPath);
+  if (!avatar) {
+    throw new ApiError(404, "faild to update avatar");
+  }
+  user.avatar = avatar?.url;
+  user.save({ validateBeforeSave: false });
+  fs.unlinkSync(avatarPath);
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "Avatar Updated Successfully"));
+});
+export {
+  registerUser,
+  loginUser,
+  logOut,
+  refreshAccessToken,
+  changePassword,
+  getCurrentUser,
+  updateAvatar,
+};
